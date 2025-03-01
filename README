@@ -1,0 +1,45 @@
+Specific ca am testat tema pe local si am avut full punctaj, apoi pe Docker la mine pe laptop si aveam variatii, posibil sa nu fi alocat
+suficiente resurse sau e de vina laptop-ul care are unele probleme in ultimul timp) asa ca am rulat pe un MAC si am avut punctaj full
+si pe Docker, fara variatii asa cum pateam la mine.
+In tema1.c am implementat uramatoarele functii, avand urmatoarele functionalitati:
+-normalize_word- elimina caracterele non-alfabetice si transforma literele majuscule in litere mici
+-add_word- adauga un cuvant (word) in structura de date WordList, impreuna cu ID-ul fisierului (file_id) in care apare.
+			Verifica dacă lista de intrari entries este NULL, adica lista nu a fost initializata, acest lucru se intampla la prima utilizare a listei, cand nu exista intrari inca; aeteaza capacitatea maxima initială a listei si aloca memorie pentru vectorul de pointeri catre structuri de tip WordEntry; parcurge toate intrarile existente din WordList, daca cuvantul exista deja, trebuie doar sa actualizeze lista de fisiere, la fel si pentru id-ul fisierelor. Asigur ca lista poate creste dinamic pe masura ce sunt adaugate mai multe fisiere pentru acelasi cuvant. Daca cuvantul nu exista, il creeaza ca o noua intrare.
+-list_files_from_file- creeaza o lista de fisiere dintr-un director sau dintr-un fisier de intrare. Daca input_path este un director, adauga toate fisierele din director. Daca este un fisier, adauga fiecare linie din fisier ca o cale. Populeaza file_list cu cai de fisiere si actualizeaza file_count cu numarul total de fisiere gssite. Apeleaza funcsia stat pentru a obtine informatii despre calea specificata in input_path, despre care
+determina daca e director/fisier. Daca input_path este un director, combina input_path cu numele fisierului folosind snprintf, pentru a obtine calea completa. Stocheaza calea completa in file_list si incrementeaza file_count, pentru a tine evidenta numarului total de fisiere procesate.
+-mapper - este responsabila de procesarea fisierelor de intrare, preluandu-le dintr-o coada partajata intre toate thread-urile Mapper. Fiecare thread Mapper citeste cate un fisier, normalizeaza cuvintele din acesta si le adauga in structura de date WordList asociata primei litere a cuvantului. Blocheaza mutex-ul queue_mutex pentru acces sincronizat. Daca mai sunt fisiere de procesat, preia index-ul fisierului curent din current_index si incrementeaza current_index pentru urmatorul Mapper thread si apoi deblocheaza mutex-ul. Apoi citeste cuvintele, le salveaza in buffer, le normalizeaza si determina prima litera. Blocheaza mutex-ul pentru litera curenta (mutexes[index]), pentru a preveni accesul concurent la WordList. Adauga cuvantul in lista corespunzatoare folosind add_word, asociaza cuvantul cu ID-ul fisierului (calculat ca file_index + 1).
+Deblocheaza mutex-ul.
+-reducer - responsabila de agregarea rezultatelor partiale generate de Mapper threads. Fiecare Reducer thread prelucreaza listele de cuvinte corespunzătoare unui interval de litere din alfabet si scrie rezultatele intr-un fisier de iesire. Blocheaza mutex-ul asociat literei curente (mutexes[letter]), astfel incat doar acest Reducer thread sa poata accesa lista de cuvinte si apoi construieste numele fisierului de iesire. Daca nu exista cuvinte pentru litera curenta, fisierul ramane gol si nu mai este necesara procesarea suplimentara. Apoi sorteaza cuvintele in functie de numarul de fisiere in care apar. Apoi scrie rezultatele in fisiere.
+-combined_thread_function -  functia comuna pentru Mapper si Reducer threads. Daca thread-ul este un Mapper, ruleaza mapper. Asteapta finalizarea tuturor Mapper threads la bariera pthread_barrier_wait. Daca thread-ul este un Reducer, ruleaza reducer. Folosesc aceasta functie pentru a creea thread-urile mapper si reduce in acelasi pthread_create.
+In main, creez lista fisierelor (file_list) folosind list_files_from_file. Initializez mutex-uri si bariere. Configurez listele de cuvinte pentru fiecare litera. Apoi creez Mapper si Reducer threads si le configurez. La final curat resursele.
+Structuri
+- WordEntry - reprezinta un cuvant unic gssit intr-un fisier si lista de fisiere in care acesta apare
+						word: sir de caractere care reprezinta cuvantul
+						file_ids: vector de ID-uri de fisiere (numere intregi)
+						file_count: numarul de fisiere in care cuvantul apare
+						file_capacity: capacitatea alocata pentru vectorul file_ids
+- WordList - stocheaza toate cuvintele unice care incep cu o anumita litera
+						entries: vector de pointeri catre structuri WordEntry
+						entry_count: numarul de cuvinte stocate
+						entry_capacity: capacitatea alocata pentru vectorul entries
+- MapperArgs - tontine informatiile necesare pentru fiecare thread Mapper
+							file_list: lista de cai catre fisierele de intrare
+							current_index: pointer catre indexul curent din lista de fisiere (utilizat pentru alocare dinamica)
+							file_count: numarul total de fisiere de procesat
+							queue_mutex: mutex pentru acces sincronizat la current_index
+							mutexes: vector de mutex-uri pentru fiecare litera a alfabetului
+							word_lists: vector de pointeri catre listele de cuvinte (WordList), cate una pentru fiecare litera
+- ReducerArgs - contine informatiile necesare pentru fiecare thread Reducer
+								mutexes: vector de mutex-uri pentru fiecare litera a alfabetului
+								word_lists: vector de pointeri catre listele de cuvinte (WordList)
+								start_letter: prima litera a alfabetului procesata de acest Reducer
+								end_letter: ultima litera a alfabetului procesata de acest Reducer
+								output_path: directorul unde vor fi salvate fisierele de iesire
+- ThreadArgs - utilizat pentru configurarea unui thread (Mapper sau Reducer)
+							is_mapper: flag care indica daca thread-ul este un Mapper (1) sau un Reducer (0)
+							start_letter: utilizat doar pentru Reducers prima litera din intervalul acestora
+							end_letter: utilizat doar pentru Reducers ultima litera din intervalul acestora
+							barrier: bariera sincronizarii Mapper-Reducer
+							mapper_args: structura de argumente pentru Mapper threads
+							reducer_args: structura de argumente pentru Reducer threads
+
