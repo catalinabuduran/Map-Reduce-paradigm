@@ -1,6 +1,3 @@
-Specific ca am testat tema pe local si am avut full punctaj, apoi pe Docker la mine pe laptop si aveam variatii, posibil sa nu fi alocat
-suficiente resurse sau e de vina laptop-ul care are unele probleme in ultimul timp) asa ca am rulat pe un MAC si am avut punctaj full
-si pe Docker, fara variatii asa cum pateam la mine.
 In tema1.c am implementat uramatoarele functii, avand urmatoarele functionalitati:
 -normalize_word- elimina caracterele non-alfabetice si transforma literele majuscule in litere mici
 -add_word- adauga un cuvant (word) in structura de date WordList, impreuna cu ID-ul fisierului (file_id) in care apare.
